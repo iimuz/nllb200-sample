@@ -8,7 +8,12 @@ requires-python = ">=3.10"
 urls = {repository = "https://example.com/hoge"}
 version = "1.0.0"
 
-dependencies = []
+dependencies = [
+  "transformers",
+  "torch",
+  "torchvision",
+  "torchaudio",
+]
 
 [tools.setuptools.package-dir]
 minimal_python = "src"
