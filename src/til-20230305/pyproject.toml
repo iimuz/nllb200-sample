@@ -9,6 +9,7 @@ urls = {repository = "https://example.com/hoge"}
 version = "1.0.0"
 
 dependencies = [
+  "pydantic",
   "transformers",
   "torch",
   "torchvision",
