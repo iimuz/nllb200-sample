@@ -1,3 +1,4 @@
+import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 tokenizer = AutoTokenizer.from_pretrained(
@@ -6,6 +7,8 @@ tokenizer = AutoTokenizer.from_pretrained(
 model = AutoModelForSeq2SeqLM.from_pretrained(
     "facebook/nllb-200-distilled-600M", cache_dir="data/external"
 )
+if torch.cuda.is_available():
+    model = model.to("mps")
 
 article = "I watched a lot of interesting animation last week."
 inputs = tokenizer(article, return_tensors="pt")
