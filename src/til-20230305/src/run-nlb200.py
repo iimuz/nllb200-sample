@@ -98,8 +98,15 @@ def _main() -> None:
     model = model.to(device_info)
 
     while True:
-        print("input article: ")
-        article = input()
+        print("input article(Stop CTRL+c):")
+        try:
+            article = input()
+        except KeyboardInterrupt:
+            if config.loop:
+                _logger.info("use ctrl+c. stop loop.")
+                break
+
+            raise
         _logger.info("input buffer: %s", article)
 
         inputs = tokenizer(article, return_tensors="pt")
