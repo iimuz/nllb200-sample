@@ -1,8 +1,8 @@
 external/*
 !external/.gitkeep
 
-internal/*
-!internal/.gitkeep
+interim/*
+!interim/.gitkeep
 
 processed/*
 !processed/.gitkeep
