@@ -28,6 +28,8 @@ class _RunConfig(BaseModel):
     source_language: str  # 入力文章の言語
     target_language: str  # 翻訳したい言語
     max_length: int  # 出力する最大文字数
+
+    loop: bool  # trueの場合は、翻訳を繰り返すモード
     device_name: str  # cpu, cuda, mps の選択肢
 
     data_dir: Path  # モデルファイルやログファイルなどの記録場所
@@ -66,7 +68,6 @@ def _main() -> None:
 
     # 実行時引数の読み込み
     config = _parse_args()
-    print(config.data_dir)
 
     # 保存場所の初期化
     interim_dir = config.data_dir / "interim"
@@ -96,19 +97,25 @@ def _main() -> None:
     )
     model = model.to(device_info)
 
-    print("input article: ")
-    article = input()
-    _logger.info("input buffer: %s", article)
+    while True:
+        print("input article: ")
+        article = input()
+        _logger.info("input buffer: %s", article)
 
-    inputs = tokenizer(article, return_tensors="pt")
-    translated_tokens = model.generate(
-        **inputs.to(device_info),
-        forced_bos_token_id=tokenizer.lang_code_to_id[config.target_language],
-        max_length=config.max_length,
-    )
-    result = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
-    print(f"result: {result}")
-    _logger.info("result: %s", result)
+        inputs = tokenizer(article, return_tensors="pt")
+        translated_tokens = model.generate(
+            **inputs.to(device_info),
+            forced_bos_token_id=tokenizer.lang_code_to_id[config.target_language],
+            max_length=config.max_length,
+        )
+        result = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
+        print(f"result: {result}")
+        _logger.info("result: %s", result)
+
+        if not config.loop:
+            break
+
+    _logger.info("success!")
 
 
 def _parse_args() -> _RunConfig:
@@ -133,6 +140,12 @@ def _parse_args() -> _RunConfig:
         default=100,
         type=int,
         help="Maximum number of characters in the output string.",
+    )
+
+    parser.add_argument(
+        "--loop",
+        action="store_true",
+        help="Repeatedly enter and perform translations.",
     )
     parser.add_argument(
         "--device-name",
