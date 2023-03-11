@@ -27,6 +27,7 @@ class _RunConfig(BaseModel):
 
     source_language: str  # 入力文章の言語
     target_language: str  # 翻訳したい言語
+    max_length: str  # 出力する最大文字数
     device_name: str  # cpu, cuda, mps の選択肢
 
     data_dir: Path  # モデルファイルやログファイルなどの記録場所
@@ -103,7 +104,7 @@ def _main() -> None:
     translated_tokens = model.generate(
         **inputs.to(device_info),
         forced_bos_token_id=tokenizer.lang_code_to_id[config.target_language],
-        max_length=100,
+        max_length=config.max_length,
     )
     result = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
     print(f"result: {result}")
@@ -125,6 +126,13 @@ def _parse_args() -> _RunConfig:
         "--target-language",
         default="jpn_Jpan",
         help="The language of the output text.",
+    )
+    parser.add_argument(
+        "-l",
+        "--max-length",
+        default=100,
+        type=int,
+        help="Maximum number of characters in the output string.",
     )
     parser.add_argument(
         "--device-name",
