@@ -27,7 +27,7 @@ class _RunConfig(BaseModel):
 
     source_language: str  # 入力文章の言語
     target_language: str  # 翻訳したい言語
-    max_length: str  # 出力する最大文字数
+    max_length: int  # 出力する最大文字数
     device_name: str  # cpu, cuda, mps の選択肢
 
     data_dir: Path  # モデルファイルやログファイルなどの記録場所
