@@ -35,8 +35,9 @@ def _main() -> None:
 
     # ログ設定
     loglevel = {
-        0: logging.INFO,
-        1: logging.DEBUG,
+        0: logging.WARNING,
+        1: logging.INFO,
+        2: logging.DEBUG,
     }.get(config.verbose, logging.DEBUG)
     _setup_logger(filepath=(interim_dir / "log.txt"), loglevel=loglevel)
     _logger.info(config)
@@ -58,6 +59,7 @@ def _main() -> None:
     but this week I couldn't watch any of it.
     Hopefully I'll be able to watch it next week...
     """
+    _logger.info("input buffer: %s", article)
     inputs = tokenizer(article, return_tensors="pt")
 
     translated_tokens = model.generate(
@@ -66,7 +68,8 @@ def _main() -> None:
         max_length=100,
     )
     result = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
-    _logger.info(result)
+    print(f"result: {result}")
+    _logger.info("result: %s", result)
 
 
 def _parse_args() -> _RunConfig:
@@ -114,7 +117,10 @@ def _setup_logger(
             maxBytes=10 * 1024 * 1024,  # 10 MB
             backupCount=1,
         )
-        file_handler.setLevel(loglevel)
+        # ファイル出力のログレベルは最低でもINFOとする。
+        # debug出力の時はdebugレベルまで出力するようにする。
+        file_loglevel = loglevel if loglevel <= logging.INFO else logging.INFO
+        file_handler.setLevel(file_loglevel)
         file_handler.setFormatter(
             Formatter("[%(levelname)7s] %(asctime)s (%(name)s) %(message)s")
         )
