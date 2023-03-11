@@ -25,6 +25,8 @@ class _AvailableDeviceName(Enum):
 class _RunConfig(BaseModel):
     # スクリプト実行のためのオプション.
 
+    source_language: str  # 入力文章の言語
+    target_language: str  # 翻訳したい言語
     device_name: str  # cpu, cuda, mps の選択肢
 
     data_dir: Path  # モデルファイルやログファイルなどの記録場所
@@ -84,7 +86,9 @@ def _main() -> None:
     device_info = _get_device(_AvailableDeviceName(config.device_name))
 
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/nllb-200-distilled-600M", cache_dir=external_dir
+        "facebook/nllb-200-distilled-600M",
+        cache_dir=external_dir,
+        src_lang=config.source_language,
     )
     model = AutoModelForSeq2SeqLM.from_pretrained(
         "facebook/nllb-200-distilled-600M", cache_dir=external_dir
@@ -103,7 +107,7 @@ def _main() -> None:
 
     translated_tokens = model.generate(
         **inputs.to(device_info),
-        forced_bos_token_id=tokenizer.lang_code_to_id["jpn_Jpan"],
+        forced_bos_token_id=tokenizer.lang_code_to_id[config.target_language],
         max_length=100,
     )
     result = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)[0]
@@ -115,6 +119,18 @@ def _parse_args() -> _RunConfig:
     # スクリプト実行のための引数を読み込む.
     parser = ArgumentParser(description="Translation using NLLB200.")
 
+    parser.add_argument(
+        "-s",
+        "--source-language",
+        default="jpn_Jpan",
+        help="The language of the input text.",
+    )
+    parser.add_argument(
+        "-t",
+        "--target-language",
+        default="eng_Latn",
+        help="The language of the output text.",
+    )
     parser.add_argument(
         "--device-name",
         default=_AvailableDeviceName.CPU.value,
