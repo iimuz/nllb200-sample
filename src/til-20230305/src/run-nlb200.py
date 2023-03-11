@@ -22,12 +22,22 @@ class _AvailableDeviceName(Enum):
     MPS: str = "mps"
 
 
+class _AvailableModelName(Enum):
+    # 利用可能なモデル名一覧.
+
+    NLLB_200_DISTILLED_600M: str = "nllb-200-distiled-600M"
+    NLLB_200_DISTILLED_1_3B: str = "nllb-200-distiled-1.3B"
+    NLLB_200_1_3B: str = "nllb-200-1.3B"
+    NLLB_200_3_3B: str = "nllb-200-3.3B"
+
+
 class _RunConfig(BaseModel):
     # スクリプト実行のためのオプション.
 
     source_language: str  # 入力文章の言語
     target_language: str  # 翻訳したい言語
     max_length: int  # 出力する最大文字数
+    model_name: str  # 利用するモデル名
 
     loop: bool  # trueの場合は、翻訳を繰り返すモード
     device_name: str  # cpu, cuda, mps の選択肢
@@ -36,17 +46,29 @@ class _RunConfig(BaseModel):
     verbose: int  # ログレベル
 
 
-def _get_device(selected_device: _AvailableDeviceName) -> torch.device:
+def _get_model_path(model_name: _AvailableModelName) -> str:
+    # 利用可能なモデル一覧からモデルのパスを返す.
+    model_paths = {
+        _AvailableModelName.NLLB_200_DISTILLED_600M: "facebook/nllb-200-distilled-600M",
+        _AvailableModelName.NLLB_200_DISTILLED_1_3B: "facebook/nllb-200-distilled-1.3B",
+        _AvailableModelName.NLLB_200_1_3B: "facebook/nllb-200-1.3B",
+        _AvailableModelName.NLLB_200_3_3B: "facebook/nllb-200-3.3B",
+    }
+
+    return model_paths[model_name]
+
+
+def _get_device(device_name: _AvailableDeviceName) -> torch.device:
     # 指定したデバイスが利用できるか判定して、利用できる場合のみデバイス情報を返す.
-    if _AvailableDeviceName.CPU == selected_device:
+    if _AvailableDeviceName.CPU == device_name:
         return torch.device("cpu")
 
-    if _AvailableDeviceName.CUDA == selected_device:
+    if _AvailableDeviceName.CUDA == device_name:
         if not torch.cuda.is_available():
             raise ValueError("CUDA not available.")
         return torch.device("cuda:0")
 
-    if _AvailableDeviceName.MPS == selected_device:
+    if _AvailableDeviceName.MPS == device_name:
         if not torch.backends.mps.is_available():
             if not torch.backends.mps.is_built():
                 raise ValueError(
@@ -60,7 +82,7 @@ def _get_device(selected_device: _AvailableDeviceName) -> torch.device:
                 )
         return torch.device("mps")
 
-    raise ValueError(f"Unknown device name: {selected_device}")
+    raise ValueError(f"Unknown device name: {device_name}")
 
 
 def _main() -> None:
@@ -87,14 +109,14 @@ def _main() -> None:
     # デバイスの設定
     device_info = _get_device(_AvailableDeviceName(config.device_name))
 
+    # モデルの読み込み
+    model_name = _get_model_path(_AvailableModelName(config.model_name))
     tokenizer = AutoTokenizer.from_pretrained(
-        "facebook/nllb-200-distilled-600M",
+        model_name,
         cache_dir=external_dir,
         src_lang=config.source_language,
     )
-    model = AutoModelForSeq2SeqLM.from_pretrained(
-        "facebook/nllb-200-distilled-600M", cache_dir=external_dir
-    )
+    model = AutoModelForSeq2SeqLM.from_pretrained(model_name, cache_dir=external_dir)
     model = model.to(device_info)
 
     while True:
@@ -147,6 +169,13 @@ def _parse_args() -> _RunConfig:
         default=100,
         type=int,
         help="Maximum number of characters in the output string.",
+    )
+    parser.add_argument(
+        "--model-name",
+        default=_AvailableModelName.NLLB_200_DISTILLED_600M.value,
+        choices=[v.value for v in _AvailableModelName],
+        type=str,
+        help="Name of the model to be used.",
     )
 
     parser.add_argument(
