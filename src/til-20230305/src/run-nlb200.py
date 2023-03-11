@@ -2,6 +2,7 @@
 import logging
 import sys
 from argparse import ArgumentParser
+from enum import Enum
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -13,11 +14,48 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 _logger = logging.getLogger(__name__)
 
 
+class _AvailableDeviceName(Enum):
+    # 利用可能なデバイス名一覧.
+
+    CPU: str = "cpu"
+    CUDA: str = "cuda"
+    MPS: str = "mps"
+
+
 class _RunConfig(BaseModel):
     # スクリプト実行のためのオプション.
 
+    device_name: str  # cpu, cuda, mps の選択肢
+
     data_dir: Path  # モデルファイルやログファイルなどの記録場所
     verbose: int  # ログレベル
+
+
+def _get_device(selected_device: _AvailableDeviceName) -> torch.device:
+    # 指定したデバイスが利用できるか判定して、利用できる場合のみデバイス情報を返す.
+    if _AvailableDeviceName.CPU == selected_device:
+        return torch.device("cpu")
+
+    if _AvailableDeviceName.CUDA == selected_device:
+        if not torch.cuda.is_available():
+            raise ValueError("CUDA not available.")
+        return torch.device("cuda:0")
+
+    if _AvailableDeviceName.MPS == selected_device:
+        if not torch.backends.mps.is_available():
+            if not torch.backends.mps.is_built():
+                raise ValueError(
+                    "MPS not available because the current PyTorch install was not"
+                    " built with MPS enabled."
+                )
+            else:
+                raise ValueError(
+                    "MPS not available because the current MacOS version is not 12.3+"
+                    " and/or you do not have an MPS-enabled device on this machine."
+                )
+        return torch.device("mps")
+
+    raise ValueError(f"Unknown device name: {selected_device}")
 
 
 def _main() -> None:
@@ -42,15 +80,16 @@ def _main() -> None:
     _setup_logger(filepath=(interim_dir / "log.txt"), loglevel=loglevel)
     _logger.info(config)
 
+    # デバイスの設定
+    device_info = _get_device(_AvailableDeviceName(config.device_name))
+
     tokenizer = AutoTokenizer.from_pretrained(
         "facebook/nllb-200-distilled-600M", cache_dir=external_dir
     )
     model = AutoModelForSeq2SeqLM.from_pretrained(
         "facebook/nllb-200-distilled-600M", cache_dir=external_dir
     )
-    if torch.cuda.is_available():
-        # model = model.to("mps")
-        model = model.to("cuda:0")
+    model = model.to(device_info)
 
     article = """
     I watched a lot of interesting animation last week.
@@ -63,7 +102,7 @@ def _main() -> None:
     inputs = tokenizer(article, return_tensors="pt")
 
     translated_tokens = model.generate(
-        **inputs.to(model.device),
+        **inputs.to(device_info),
         forced_bos_token_id=tokenizer.lang_code_to_id["jpn_Jpan"],
         max_length=100,
     )
@@ -74,15 +113,27 @@ def _main() -> None:
 
 def _parse_args() -> _RunConfig:
     # スクリプト実行のための引数を読み込む.
-    parser = ArgumentParser(description="NLLB200を利用した日英翻訳.")
+    parser = ArgumentParser(description="Translation using NLLB200.")
+
+    parser.add_argument(
+        "--device-name",
+        default=_AvailableDeviceName.CPU.value,
+        choices=[v.value for v in _AvailableDeviceName],
+        type=str,
+        help="Select the device to be used.",
+    )
 
     parser.add_argument(
         "--data-dir",
         default=(Path(__file__).parents[1] / "data").resolve(),
-        help="モデルファイルやログファイルの記録場所のルートパス.",
+        help="Root path of where model files nad log files are saved.",
     )
     parser.add_argument(
-        "-v", "--verbose", action="count", default=0, help="詳細メッセージのレベルを設定."
+        "-v",
+        "--verbose",
+        action="count",
+        default=0,
+        help="Set the log level for detailed messages.",
     )
 
     args = parser.parse_args()
