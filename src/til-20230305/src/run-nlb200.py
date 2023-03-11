@@ -95,16 +95,11 @@ def _main() -> None:
     )
     model = model.to(device_info)
 
-    article = """
-    I watched a lot of interesting animation last week.
-    I heard it was nice today, but it didn't rain!
-    I saw a lot of interesting animation last week,
-    but this week I couldn't watch any of it.
-    Hopefully I'll be able to watch it next week...
-    """
+    print("input article: ")
+    article = input()
     _logger.info("input buffer: %s", article)
-    inputs = tokenizer(article, return_tensors="pt")
 
+    inputs = tokenizer(article, return_tensors="pt")
     translated_tokens = model.generate(
         **inputs.to(device_info),
         forced_bos_token_id=tokenizer.lang_code_to_id[config.target_language],
@@ -122,13 +117,13 @@ def _parse_args() -> _RunConfig:
     parser.add_argument(
         "-s",
         "--source-language",
-        default="jpn_Jpan",
+        default="eng_Latn",
         help="The language of the input text.",
     )
     parser.add_argument(
         "-t",
         "--target-language",
-        default="eng_Latn",
+        default="jpn_Jpan",
         help="The language of the output text.",
     )
     parser.add_argument(
@@ -164,7 +159,11 @@ def _setup_logger(
 ) -> None:
     # ログ出力設定
     # ファイル出力とコンソール出力を行うように設定する。
-    _logger.setLevel(loglevel)
+
+    # ファイル出力のログレベルは最低でもINFOとする。
+    # debug出力の時はdebugレベルまで出力するようにする。
+    minimum_loglevel = loglevel if loglevel <= logging.INFO else logging.INFO
+    _logger.setLevel(minimum_loglevel)
 
     # consoleログ
     console_handler = StreamHandler(stream=sys.stdout)
@@ -184,10 +183,7 @@ def _setup_logger(
             maxBytes=10 * 1024 * 1024,  # 10 MB
             backupCount=1,
         )
-        # ファイル出力のログレベルは最低でもINFOとする。
-        # debug出力の時はdebugレベルまで出力するようにする。
-        file_loglevel = loglevel if loglevel <= logging.INFO else logging.INFO
-        file_handler.setLevel(file_loglevel)
+        file_handler.setLevel(minimum_loglevel)
         file_handler.setFormatter(
             Formatter("[%(levelname)7s] %(asctime)s (%(name)s) %(message)s")
         )
