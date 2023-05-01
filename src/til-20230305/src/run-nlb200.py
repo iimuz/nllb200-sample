@@ -2,7 +2,6 @@
 import logging
 import sys
 from argparse import ArgumentParser
-from enum import Enum
 from logging import Formatter, StreamHandler
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -11,24 +10,9 @@ import torch
 from pydantic import BaseModel
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
+from select_items import AvailableDeviceName, AvailableModelName
+
 _logger = logging.getLogger(__name__)
-
-
-class _AvailableDeviceName(Enum):
-    # 利用可能なデバイス名一覧.
-
-    CPU: str = "cpu"
-    CUDA: str = "cuda"
-    MPS: str = "mps"
-
-
-class _AvailableModelName(Enum):
-    # 利用可能なモデル名一覧.
-
-    NLLB_200_DISTILLED_600M: str = "nllb-200-distiled-600M"
-    NLLB_200_DISTILLED_1_3B: str = "nllb-200-distiled-1.3B"
-    NLLB_200_1_3B: str = "nllb-200-1.3B"
-    NLLB_200_3_3B: str = "nllb-200-3.3B"
 
 
 class _RunConfig(BaseModel):
@@ -46,29 +30,29 @@ class _RunConfig(BaseModel):
     verbose: int  # ログレベル
 
 
-def _get_model_path(model_name: _AvailableModelName) -> str:
+def _get_model_path(model_name: AvailableModelName) -> str:
     # 利用可能なモデル一覧からモデルのパスを返す.
     model_paths = {
-        _AvailableModelName.NLLB_200_DISTILLED_600M: "facebook/nllb-200-distilled-600M",
-        _AvailableModelName.NLLB_200_DISTILLED_1_3B: "facebook/nllb-200-distilled-1.3B",
-        _AvailableModelName.NLLB_200_1_3B: "facebook/nllb-200-1.3B",
-        _AvailableModelName.NLLB_200_3_3B: "facebook/nllb-200-3.3B",
+        AvailableModelName.NLLB_200_DISTILLED_600M: "facebook/nllb-200-distilled-600M",
+        AvailableModelName.NLLB_200_DISTILLED_1_3B: "facebook/nllb-200-distilled-1.3B",
+        AvailableModelName.NLLB_200_1_3B: "facebook/nllb-200-1.3B",
+        AvailableModelName.NLLB_200_3_3B: "facebook/nllb-200-3.3B",
     }
 
     return model_paths[model_name]
 
 
-def _get_device(device_name: _AvailableDeviceName) -> torch.device:
+def _get_device(device_name: AvailableDeviceName) -> torch.device:
     # 指定したデバイスが利用できるか判定して、利用できる場合のみデバイス情報を返す.
-    if _AvailableDeviceName.CPU == device_name:
+    if AvailableDeviceName.CPU == device_name:
         return torch.device("cpu")
 
-    if _AvailableDeviceName.CUDA == device_name:
+    if AvailableDeviceName.CUDA == device_name:
         if not torch.cuda.is_available():
             raise ValueError("CUDA not available.")
         return torch.device("cuda:0")
 
-    if _AvailableDeviceName.MPS == device_name:
+    if AvailableDeviceName.MPS == device_name:
         if not torch.backends.mps.is_available():
             if not torch.backends.mps.is_built():
                 raise ValueError(
@@ -107,10 +91,10 @@ def _main() -> None:
     _logger.info(config)
 
     # デバイスの設定
-    device_info = _get_device(_AvailableDeviceName(config.device_name))
+    device_info = _get_device(AvailableDeviceName(config.device_name))
 
     # モデルの読み込み
-    model_name = _get_model_path(_AvailableModelName(config.model_name))
+    model_name = _get_model_path(AvailableModelName(config.model_name))
     tokenizer = AutoTokenizer.from_pretrained(
         model_name,
         cache_dir=external_dir,
@@ -172,8 +156,8 @@ def _parse_args() -> _RunConfig:
     )
     parser.add_argument(
         "--model-name",
-        default=_AvailableModelName.NLLB_200_DISTILLED_600M.value,
-        choices=[v.value for v in _AvailableModelName],
+        default=AvailableModelName.NLLB_200_DISTILLED_600M.value,
+        choices=[v.value for v in AvailableModelName],
         type=str,
         help="Name of the model to be used.",
     )
@@ -185,8 +169,8 @@ def _parse_args() -> _RunConfig:
     )
     parser.add_argument(
         "--device-name",
-        default=_AvailableDeviceName.CPU.value,
-        choices=[v.value for v in _AvailableDeviceName],
+        default=AvailableDeviceName.CPU.value,
+        choices=[v.value for v in AvailableDeviceName],
         type=str,
         help="Select the device to be used.",
     )
